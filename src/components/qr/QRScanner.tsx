@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, CameraOff, Upload, Search, AlertCircle, ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Camera, CameraOff, Upload, Search, AlertCircle, ArrowRight, Sparkles } from "lucide-react";
+import type { Html5Qrcode } from "html5-qrcode";
 
 interface QRScannerProps {
   onScanSuccess?: (uuid: string) => void;
@@ -15,8 +15,20 @@ export function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualInput, setManualInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [registeredItems, setRegisteredItems] = useState<any[]>([]);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch("/api/items")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          setRegisteredItems(res.data.slice(0, 4));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Helper to extract UUID whether input is raw UUID or full URL
   const extractUuid = (text: string): string | null => {
@@ -44,6 +56,7 @@ export function QRScanner({ onScanSuccess }: QRScannerProps) {
   const startCamera = async () => {
     setCameraError(null);
     try {
+      const { Html5Qrcode } = await import("html5-qrcode");
       const html5QrCode = new Html5Qrcode("reader");
       scannerRef.current = html5QrCode;
 
@@ -99,6 +112,7 @@ export function QRScanner({ onScanSuccess }: QRScannerProps) {
 
     try {
       setCameraError(null);
+      const { Html5Qrcode } = await import("html5-qrcode");
       const html5QrCode = new Html5Qrcode("reader");
       const result = await html5QrCode.scanFile(file, true);
       const uuid = extractUuid(result);
@@ -236,55 +250,43 @@ export function QRScanner({ onScanSuccess }: QRScannerProps) {
         </div>
       </form>
 
-      {/* Seeded Quick-Test Items */}
+      {/* Registered Instruments Quick Resolver */}
       <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4">
         <div className="flex items-center space-x-1.5 text-xs font-semibold text-cyan-400 mb-2">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>Quick-Demo Asset Resolvers (Seeded Instruments)</span>
+          <span>Quick-Demo Asset Resolvers</span>
         </div>
-        <p className="text-[11px] text-slate-400 mb-3">
-          Click any seeded instrument below to immediately simulate a QR code scan:
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={async () => {
-              const res = await fetch("/api/items");
-              const data = await res.json();
-              if (data.data?.length > 0) {
-                // Pick Chair #L1-5 if present, or first
-                const target = data.data.find((i: any) => i.name.includes("Chair #L1-5")) || data.data[0];
-                router.push(`/inventory/item/${target.qr_uuid}`);
-              }
-            }}
-            className="text-left p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-200">Chair #L1-5</span>
-              <span className="text-[10px] text-cyan-400 bg-cyan-950 px-1.5 py-0.5 rounded">Lab 1</span>
+        {registeredItems.length > 0 ? (
+          <>
+            <p className="text-[11px] text-slate-400 mb-3">
+              Click any registered instrument below to immediately simulate a QR code scan:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {registeredItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => router.push(`/inventory/item/${item.qr_uuid}`)}
+                  className="text-left p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-200 truncate">{item.name}</span>
+                    <span className="text-[10px] text-cyan-400 bg-cyan-950 px-1.5 py-0.5 rounded ml-2 flex-shrink-0">
+                      {item.lab?.name || "Lab"}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                    {item.system ? `Bundled in ${item.system.unique_id}` : "Standalone Instrument"}
+                  </p>
+                </button>
+              ))}
             </div>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">Standalone • Audit Trail Demo</p>
-          </button>
-
-          <button
-            type="button"
-            onClick={async () => {
-              const res = await fetch("/api/items");
-              const data = await res.json();
-              if (data.data?.length > 0) {
-                const target = data.data.find((i: any) => i.name.includes("UltraSharp")) || data.data[1];
-                router.push(`/inventory/item/${target.qr_uuid}`);
-              }
-            }}
-            className="text-left p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-colors"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-200">Dell UltraSharp 27"</span>
-              <span className="text-[10px] text-cyan-400 bg-cyan-950 px-1.5 py-0.5 rounded">Digital Lab</span>
-            </div>
-            <p className="text-[10px] text-slate-400 truncate mt-0.5">Bundled in SYS-DL-001</p>
-          </button>
-        </div>
+          </>
+        ) : (
+          <p className="text-xs text-slate-400">
+            No instruments registered yet. The appointed Lab In-Charge can register equipment from the Dashboard, which will automatically generate printable QR tags and link here.
+          </p>
+        )}
       </div>
     </div>
   );

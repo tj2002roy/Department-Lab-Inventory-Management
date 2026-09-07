@@ -1,7 +1,20 @@
 "use client";
 
-import { QRScanner } from "@/components/qr/QRScanner";
-import { QrCode, Sparkles, ShieldCheck } from "lucide-react";
+import dynamic from "next/dynamic";
+import { QrCode } from "lucide-react";
+
+const QRScanner = dynamic(
+  () => import("@/components/qr/QRScanner").then((mod) => mod.QRScanner),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full max-w-xl mx-auto p-12 text-center text-slate-400 bg-slate-900 border border-slate-800 rounded-2xl">
+        <div className="animate-spin h-8 w-8 border-2 border-cyan-500 border-t-transparent rounded-full mx-auto mb-3" />
+        <p className="text-sm font-medium">Initializing Optical QR Scanner...</p>
+      </div>
+    ),
+  }
+);
 
 export default function ScanPage() {
   return (
