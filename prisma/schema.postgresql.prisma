@@ -1,0 +1,125 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  AUDITOR
+}
+
+enum ActionType {
+  UPDATE
+  MOVE
+  COMMENT
+}
+
+model User {
+  id             String          @id @default(uuid())
+  username       String          @unique
+  password       String
+  name           String
+  email          String          @unique
+  role           Role            @default(TEACHER)
+  labAssignments LabAssignment[]
+  activityLogs   ActivityLog[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("users")
+}
+
+model Lab {
+  id          String          @id @default(uuid())
+  name        String          @unique
+  description String?
+  systems     System[]
+  items       Item[]
+  assignments LabAssignment[]
+  sourceLogs  ActivityLog[]   @relation("FromLab")
+  targetLogs  ActivityLog[]   @relation("ToLab")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("labs")
+}
+
+model LabAssignment {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  labId        String
+  lab          Lab       @relation(fields: [labId], references: [id], onDelete: Cascade)
+  assignedById String?
+  assignedAt   DateTime  @default(now())
+
+  @@unique([userId, labId])
+  @@index([userId])
+  @@index([labId])
+  @@map("lab_assignments")
+}
+
+model System {
+  id           String        @id @default(uuid())
+  unique_id    String        @unique
+  name         String
+  status       String        @default("OPERATIONAL")
+  labId        String
+  lab          Lab           @relation(fields: [labId], references: [id], onDelete: Restrict)
+  items        Item[]
+  activityLogs ActivityLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([labId])
+  @@index([unique_id])
+  @@map("systems")
+}
+
+model Item {
+  id           String        @id @default(uuid())
+  qr_uuid      String        @unique @default(uuid())
+  name         String
+  category     String
+  attributes   Json          @default("{}")
+  systemId     String?
+  system       System?       @relation(fields: [systemId], references: [id], onDelete: SetNull)
+  labId        String
+  lab          Lab           @relation(fields: [labId], references: [id], onDelete: Restrict)
+  activityLogs ActivityLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([qr_uuid])
+  @@index([labId])
+  @@index([systemId])
+  @@map("items")
+}
+
+model ActivityLog {
+  id           String      @id @default(uuid())
+  itemId       String?
+  item         Item?       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  systemId     String?
+  system       System?     @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  action_type  ActionType
+  fromLabId    String?
+  fromLab      Lab?        @relation("FromLab", fields: [fromLabId], references: [id], onDelete: SetNull)
+  toLabId      String?
+  toLab        Lab?        @relation("ToLab", fields: [toLabId], references: [id], onDelete: SetNull)
+  comment_text String?     @db.Text
+  timestamp    DateTime    @default(now())
+
+  @@index([itemId])
+  @@index([systemId])
+  @@index([userId])
+  @@index([timestamp])
+  @@map("activity_logs")
+}
